@@ -6,36 +6,51 @@ import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 
+type Question = {
+  question: string;
+  options: string[];
+  answer: string;
+};
+
+type QuizData = {
+  question: string;
+  selectedAnswer: string | null;
+  correctAnswer: string;
+  isCorrect: boolean;
+};
+
+interface UserInfo {
+  name: string;
+  email: string;
+}
+
 export default function Quiz() {
   const router = useRouter();
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [isQuizFinished, setIsQuizFinished] = useState(false);
   const [cheater, setCheater] = useState(false);
-  const [quizStartTime, setQuizStartTime] = useState(null);
-  const [userInfo, setUserInfo] = useState(null);
-  const [quizData, setQuizData] = useState([]);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [quizData, setQuizData] = useState<QuizData[]>([]);
 
-  // Fetch user info from localStorage
   useEffect(() => {
     const storedUserInfo = localStorage.getItem("userInfo");
     if (!storedUserInfo) {
-      router.push("/"); // Redirect to home page if no user info
+      router.push("/");
       return;
     }
     setUserInfo(JSON.parse(storedUserInfo));
 
-    // Fetch quiz data from JsonBin
     const fetchQuestions = async () => {
       try {
         const response = await axios.get(
-          "https://api.jsonbin.io/v3/b/675a8dafacd3cb34a8b8497f", // Replace with your JsonBin API URL
+          "https://api.jsonbin.io/v3/b/675a8dafacd3cb34a8b8497f",
           {
             headers: {
               "X-Master-Key":
-                "$2a$10$Rusziepf2wXA6TC6ngVL4uxfLWmKDTYM2l/DaRaQ7e5wGGV/cwSm6", // Replace with your JsonBin master key
+                "$2a$10$Rusziepf2wXA6TC6ngVL4uxfLWmKDTYM2l/DaRaQ7e5wGGV/cwSm6",
             },
           }
         );
@@ -48,11 +63,10 @@ export default function Quiz() {
     fetchQuestions();
   }, [router]);
 
-  // Track tab visibility changes (when user switches tabs)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setCheater(true); // If the tab is hidden, mark as cheater
+        setCheater(true);
       }
     };
 
@@ -63,22 +77,20 @@ export default function Quiz() {
     };
   }, []);
 
-  // Handle answer selection
-  const handleAnswerSelect = (answer) => {
+  const handleAnswerSelect = (answer: string) => {
     setSelectedAnswer(answer);
   };
 
-  // Next question logic
   const nextQuestion = () => {
     if (selectedAnswer === questions[currentQuestionIndex].answer) {
       setScore(score + 1);
     }
 
-    setQuizData([
-      ...quizData,
+    setQuizData((prevData) => [
+      ...prevData,
       {
         question: questions[currentQuestionIndex].question,
-        selectedAnswer: selectedAnswer,
+        selectedAnswer,
         correctAnswer: questions[currentQuestionIndex].answer,
         isCorrect: selectedAnswer === questions[currentQuestionIndex].answer,
       },
@@ -86,7 +98,7 @@ export default function Quiz() {
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setSelectedAnswer(null); // Reset selected answer for next question
+      setSelectedAnswer(null);
     } else {
       setIsQuizFinished(true);
       sendResultsToEmail();
@@ -94,21 +106,23 @@ export default function Quiz() {
   };
 
   const sendResultsToEmail = async () => {
+    if (!userInfo) return;
+
     const formData = new FormData();
     formData.append("name", userInfo.name);
     formData.append("email", userInfo.email);
-    formData.append("score", score);
-    formData.append("totalQuestions", questions.length);
+    formData.append("score", score.toString());
+    formData.append("totalQuestions", questions.length.toString());
     formData.append("cheater", cheater ? "Yes" : "No");
 
     quizData.forEach((data, index) => {
       formData.append(`question${index + 1}`, data.question);
-      formData.append(`answer${index + 1}`, data.selectedAnswer);
+      formData.append(`answer${index + 1}`, data.selectedAnswer || "");
       formData.append(`correctAnswer${index + 1}`, data.correctAnswer);
       formData.append(`isCorrect${index + 1}`, data.isCorrect ? "Yes" : "No");
     });
 
-    formData.append("access_key", "b356b3b3-d5d9-494b-a082-a6420a2acbc3"); // API key here
+    formData.append("access_key", "b356b3b3-d5d9-494b-a082-a6420a2acbc3");
 
     try {
       const response = await axios.post(
@@ -149,13 +163,21 @@ export default function Quiz() {
                   <div
                     key={index}
                     onClick={() => handleAnswerSelect(option)}
-                    className="my-2 bg-accent p-3 rounded-lg"
+                    className={`my-2 p-3 rounded-lg cursor-pointer ${
+                      selectedAnswer === option
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-200"
+                    }`}
                   >
                     {option}
                   </div>
                 ))}
               </div>
-              <Button onClick={nextQuestion} disabled={!selectedAnswer}>
+              <Button
+                onClick={nextQuestion}
+                disabled={!selectedAnswer}
+                className="mt-4"
+              >
                 Next
               </Button>
             </>
